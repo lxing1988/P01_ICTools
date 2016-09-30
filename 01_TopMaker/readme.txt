@@ -1,6 +1,6 @@
 
 Description :
-  This is a verilog top level connecton project. The script is writen by perl.
+  This is a verilog top level connection project. The script is writen by perl.
   
 
 Author : Bruce 
