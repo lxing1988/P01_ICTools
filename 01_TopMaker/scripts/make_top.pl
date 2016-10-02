@@ -651,6 +651,7 @@ sub PrintPortAssignment() {
         my $assignwith = $port->{'assignwith'} ;
         my $pname      = $port->{'name'} ;
         my $pwidth     = $port->{'width'} ;
+        my $pdirection = $port->{'direction'} ;
         if(($property ne 'comment') && ($assignwith ne '__invalid__')) {
             my $foundflag = 0 ;
             foreach my $wire (@{$wiresref}) {
@@ -668,7 +669,14 @@ sub PrintPortAssignment() {
                 } else {
                     $pwidth = ('[' . ($pwidth-1) . ':' . '0' . ']') ;
                 }
-                printf $FH ("assign %-20s = %-30s ; \n", ($pname . $pwidth), $assignwith) ;
+                if($pdirection =~ m/input/) {
+                    printf $FH ("assign %-20s = %-30s ; \n", $assignwith, ($pname . $pwidth)) ;
+                } elsif($pdirection =~ m/output/) {
+                    printf $FH ("assign %-20s = %-30s ; \n", ($pname . $pwidth), $assignwith) ;
+                } elsif($pdirection =~ m/inout/) {
+                    printf("W003 : Inout direction reassigned!  [%s.%s] \n", $pname, $assignwith);
+                    printf $FH ("assign %-20s = %-30s ; \n", ($pname . $pwidth), $assignwith) ;
+                }
             } else {
                 printf("E003 : Ports assigned a wire not in WireField!  [%s.%s] \n", $pname, $assignwith);
             }
