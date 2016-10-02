@@ -168,6 +168,8 @@ my %SubModuleInfo                                            ;
 my @SubModulePortsInfo                                       ;    
 my @SubModuleParamInfo                                       ;    
 #-------------------------------------------------------------------------------------
+my $BlankLineStyle         = ('-' x 37)                      ;
+#-------------------------------------------------------------------------------------
 
 
 GetOptions("xi=s"     => \$InputXlsFile, 
@@ -563,14 +565,23 @@ sub PrintDumySubModules() {
         my $ModuleName = $module->{'DecalareName'} ;
         my $pinscnt = 0 ;
         my $space4 = (" " x 4) ;
+        my @dumy ;
         open(my $FH, '>', "${ModuleName}.v") or die("Error : %!") ;
 
-        &PrintFileHeader($FH, ${ModuleName}) ;
+        &PrintFileHeader($FH, ${ModuleName}, \@dumy) ;
         printf $FH ("module %s ( \n", $ModuleName) ;
+        
+        SUBMODULE_LOOP:
         foreach my $pin (@{$module->{'PinsInfo'}}) {
+            my $property  = $pin->{'property'} ;
             my $direction = $pin->{'direction'} ;
             my $name      = $pin->{'name'} ;
             my $width     = $pin->{'width'} ;
+            my $comment   = $pin->{'comment'} ;
+            if($property eq 'comment') {
+                next SUBMODULE_LOOP ;
+            }
+            #printf("DEBUG : $ModuleName - $direction - $name - $width \n");
             $pinscnt++ ;
             if($pinscnt > 1) {
                 printf $FH ("%s, ", $space4) ;
@@ -584,12 +595,17 @@ sub PrintDumySubModules() {
             }
             printf $FH ("%-6s", lc($direction)) ;
             printf $FH ("%s%10s", $space4, $width) ;
-            printf $FH ("%s%s\n", $space4, $name) ;
+            printf $FH ("%s%-30s", $space4, $name) ;
+            if($comment ne '__invalid__') {
+                printf $FH ("%s%s%s\n", $space4, '// ', $comment) ;
+            }
+            printf $FH ("%s\n", " ") ;
         }
         printf $FH (") ; \n") ;
         printf $FH ("\n") ;
         printf $FH ("// This is a dumy module") ;
         printf $FH ("\n\n") ;
+        &PrintParameterField($FH, $module->{'ParamsInfo'}, 'TOPMODULE', '__invalid__') ;
         printf $FH ("endmodule // %s \n", $ModuleName) ;
         
         close($FH) or die("Error : $!") ; 
@@ -617,11 +633,54 @@ sub PrintCreatedModule() {
     &PrintPortField($FH, $CreateModule{'Ports'}) ;
     &PrintParameterField($FH, $CreateModule{'ParamsInfo'}, 'TOPMODULE', '__invalid__') ;
     &PrintWireField($FH, $CreateModule{'Wires'}) ;
+    &PrintPortAssignment($FH, $CreateModule{'Ports'}, $CreateModule{'Wires'}) ;
     &PrintSubModuleField($FH, $CreateModule{'SubModules'}) ;
     printf $FH ("\nendmodule // %s\n", $TopModuleName) ;
     
     close($FH) or die ("Error : $!") ;
 } # PrintCreatedModule
+
+
+sub PrintPortAssignment() {
+    my $FH        = shift(@_) ;
+    my $portsref  = shift(@_) ;
+    my $wiresref  = shift(@_) ;
+
+    foreach my $port (@{$portsref}) {
+        my $property   = $port->{'property'} ;
+        my $assignwith = $port->{'assignwith'} ;
+        my $pname      = $port->{'name'} ;
+        my $pwidth     = $port->{'width'} ;
+        if(($property ne 'comment') && ($assignwith ne '__invalid__')) {
+            my $foundflag = 0 ;
+            foreach my $wire (@{$wiresref}) {
+                my $asname = $assignwith ;
+                my $wname  = $wire->{'name'} ;
+                $wname =~ s/\[.*\]//g ;
+                $asname =~ s/\[.*\]//g ;
+                if($asname eq $wname) {
+                    $foundflag = 1
+                }
+            }
+            if($foundflag == 1) {
+                if($pwidth == 1) {
+                    $pwidth = "" ;
+                } else {
+                    $pwidth = ('[' . ($pwidth-1) . ':' . '0' . ']') ;
+                }
+                printf $FH ("assign %-20s = %-30s ; \n", ($pname . $pwidth), $assignwith) ;
+            } else {
+                printf("E003 : Ports assigned a wire not in WireField!  [%s.%s] \n", $pname, $assignwith);
+            }
+        }
+
+    }
+
+    printf $FH ("\n") ;
+
+
+} # PrintPortAssignment
+
 
 
 sub PrintSubModuleField() {
@@ -707,7 +766,11 @@ sub PrintSubModuleField() {
                     print $FH ("\n") ;
                 }
             } elsif($property eq 'comment') {
-                printf $FH ("%s%s\n", '// ', $comment) ;
+                if($comment eq '__invalid__') {
+                    printf $FH ("%s %s\n", '//', $BlankLineStyle) ;
+                } else {
+                    printf $FH ("%s %s\n", '//', $comment) ;
+                }
             } else {
                 printf("%s%s\n", 'E007 : ', "<PrintSubModuleField.property> illegal variable");
             }
@@ -758,7 +821,11 @@ sub PrintWireField() {
                 }
             }
         } elsif ($property eq 'comment') {
-            printf $FH ("%s%s\n", '// ', $comment) ;
+            if($comment eq '__invalid__') {
+                printf $FH ("%s %s\n", '//', $BlankLineStyle) ;
+            } else {
+                printf $FH ("%s%s\n", '// ', $comment) ;
+            }
         } else {
            printf("%s%s\n", 'E007 : ', "<PrintWireField.property> illegal variable")
         }
@@ -872,7 +939,11 @@ sub PrintPortField() {
             }
             printf $FH ("\n") ;
         } elsif($property eq 'comment') {
-            printf $FH ("%s %s\n", '// ', "$comment") ;
+            if($comment eq '__invalid__') {
+                printf $FH ("%s %s\n", '//', $BlankLineStyle) ;
+            } else {
+                printf $FH ("%s %s\n", '// ', "$comment") ;
+            }
         } else {
             printf ("%s%s\n", 'E007 : ', "<PrintPortField.property> illegal variable") ;
         }
@@ -896,10 +967,12 @@ sub PrintFileHeader() {
     printf $distf ("//  TopMaker Version : %s \n", $VersionName) ;
     printf $distf ("//  Environment OS   : %s \n", "$^O"       ) ;
     printf $distf ("//  Date             : %s \n", $datetime   ) ;
-    printf $distf ("// %s\n", ('-' x $linewidth)) ;
-    printf $distf ("// %s\n", "SubModule Informations") ;
-    printf $distf ("// %s\n", ('-' x $linewidth)) ;
-    &PrintSubModuleInfo($distf, $submodules) ;
+    if(@{$submodules} > 0) {
+        printf $distf ("// %s\n", ('-' x $linewidth)) ;
+        printf $distf ("// %s\n", "SubModule Informations") ;
+        printf $distf ("// %s\n", ('-' x $linewidth)) ;
+        &PrintSubModuleInfo($distf, $submodules) ;
+    }
     printf $distf ("// %s\n", ('=' x $linewidth)) ;
     printf $distf ("\n") ;
 } # PrintFileHeader
