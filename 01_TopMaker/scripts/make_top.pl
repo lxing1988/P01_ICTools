@@ -41,7 +41,9 @@
 #                   - 2. Support parse parameter.
 #                   - 3. Support print submodules in fileheader. 
 #                   - 4. Add Split comment line. 
-#
+#               r1v07 @ 20161002
+#                   - 1. Add sub function <PrintPortAssignment>, to enable assignable in port field
+#                   - 2. Fix bugs in sub function <PrintDumySubModules>
 #
 #===============================================================================
 
@@ -154,7 +156,7 @@ my $WriteBackExcelEnable   = 0                               ;
 my $MaxCommentLength       = 120                             ;    
 my $SubModulePinNameWidth  = 30                              ;    
 my $SubModuleWireNameWidth = 40                              ;    
-my $VersionName            = "v1.0.5"                        ;    
+my $VersionName            = "v1.0.7"                        ;    
 my $SheetRef                                                 ;    
 my $SheetPage                                                ;    
 my $PageLable                                                ;    
